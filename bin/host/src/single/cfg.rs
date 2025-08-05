@@ -15,7 +15,7 @@ use kona_preimage::{
     BidirectionalChannel, Channel, HintReader, HintWriter, OracleReader, OracleServer,
 };
 use kona_proof::HintType;
-use kona_providers_alloy::{OnlineBeaconClient, OnlineBlobProvider};
+use kona_providers_alloy::{BeaconClient, OnlineBeaconClient, OnlineBlobProvider};
 use kona_std_fpvm::{FileChannel, FileDescriptor};
 use op_alloy_network::Optimism;
 use serde::Serialize;
@@ -252,7 +252,7 @@ impl SingleChainHost {
     }
 
     /// Creates the providers required for the host backend.
-    pub async fn create_providers(&self) -> Result<SingleChainProviders, SingleChainHostError> {
+    pub async fn create_providers(&self) -> Result<SingleChainProviders<OnlineBeaconClient>, SingleChainHostError> {
         let l1_provider = http_provider(
             self.l1_node_address
                 .as_ref()
@@ -274,18 +274,18 @@ impl SingleChainHost {
     }
 }
 
-impl OnlineHostBackendCfg for SingleChainHost {
+impl <B: BeaconClient> OnlineHostBackendCfg for SingleChainHost {
     type HintType = HintType;
-    type Providers = SingleChainProviders;
+    type Providers = SingleChainProviders<B>;
 }
 
 /// The providers required for the single chain host.
 #[derive(Debug, Clone)]
-pub struct SingleChainProviders {
+pub struct SingleChainProviders<B: BeaconClient> {
     /// The L1 EL provider.
     pub l1: RootProvider,
     /// The L1 beacon node provider.
-    pub blobs: OnlineBlobProvider<OnlineBeaconClient>,
+    pub blobs: OnlineBlobProvider<B>,
     /// The L2 EL provider.
     pub l2: RootProvider<Optimism>,
 }
