@@ -274,9 +274,9 @@ impl SingleChainHost {
     }
 }
 
-impl <B: BeaconClient> OnlineHostBackendCfg for SingleChainHost {
+impl OnlineHostBackendCfg for SingleChainHost {
     type HintType = HintType;
-    type Providers = SingleChainProviders<B>;
+    type Providers = SingleChainProviders<OnlineBeaconClient>;
 }
 
 /// The providers required for the single chain host.
