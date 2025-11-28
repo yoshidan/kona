@@ -21,6 +21,9 @@ pub use builder::{BlockBuildingOutcome, StatelessL2Builder, compute_receipts_roo
 mod errors;
 pub use errors::{ExecutorError, ExecutorResult, TrieDBError, TrieDBResult};
 
+mod inspector;
+pub use inspector::TracingInspector;
+
 pub(crate) mod util;
 
 #[cfg(any(test, feature = "test-utils"))]

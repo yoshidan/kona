@@ -4,7 +4,7 @@
 //! for OP Stack L2 chains that operates in a stateless manner, pulling required state
 //! data from a [TrieDB] during execution rather than maintaining full state.
 
-use crate::{ExecutorError, ExecutorResult, TrieDB, TrieDBError, TrieDBProvider};
+use crate::{ExecutorError, ExecutorResult, TracingInspector, TrieDB, TrieDBError, TrieDBProvider};
 use alloc::{string::ToString, vec::Vec};
 use alloy_consensus::{Header, Sealed, crypto::RecoveryError};
 use alloy_evm::{
@@ -253,7 +253,10 @@ where
             .with_bundle_update()
             .without_state_clear()
             .build();
-        let evm = self.factory.evm_factory().create_evm(&mut state, evm_env);
+        let evm = self
+            .factory
+            .evm_factory()
+            .create_evm_with_inspector(&mut state, evm_env, TracingInspector::new());
         let ctx = OpBlockExecutionCtx {
             parent_hash,
             parent_beacon_block_root: attrs.payload_attributes.parent_beacon_block_root,
