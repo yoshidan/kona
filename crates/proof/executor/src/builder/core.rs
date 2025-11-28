@@ -270,7 +270,28 @@ where
             .recovered_transactions_with_encoded()
             .collect::<Result<Vec<_>, RecoveryError>>()
             .map_err(ExecutorError::Recovery)?;
-        let ex_result = executor.execute_block(transactions.iter())?;
+
+        // Execute transactions individually to log per-transaction details.
+        let mut executor = executor;
+        executor.apply_pre_execution_changes()?;
+        for (tx_idx, tx) in transactions.iter().enumerate() {
+            let gas_used = executor.execute_transaction_with_result_closure(tx, |result| {
+                info!(
+                    target: "tx_trace",
+                    tx_index = tx_idx,
+                    gas_used = result.gas_used(),
+                    success = result.is_success(),
+                    "Transaction executed"
+                );
+            })?;
+            info!(
+                target: "tx_trace",
+                tx_index = tx_idx,
+                gas_used = gas_used,
+                "Transaction committed"
+            );
+        }
+        let ex_result = executor.apply_post_execution_changes()?;
 
         info!(
             target: "block_builder",
