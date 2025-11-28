@@ -5,7 +5,7 @@ use revm::{
     context::JournalTr,
     context_interface::ContextTr,
     interpreter::{
-        interpreter_types::{Jumps, StackTr},
+        interpreter_types::{Jumps, MemoryTr, StackTr},
         Interpreter, InterpreterTypes,
     },
     state::bytecode::opcode::OpCode,
@@ -22,7 +22,7 @@ impl TracingInspector {
         Self
     }
 
-    /// Formats the stack for logging.
+    /// Formats the stack for logging (decimal format).
     fn format_stack<S: StackTr>(stack: &S) -> String {
         let data = stack.data();
         let mut result = String::new();
@@ -30,7 +30,7 @@ impl TracingInspector {
             if i > 0 {
                 result.push_str(", ");
             }
-            result.push_str(&alloc::format!("{:#x}", value));
+            result.push_str(&alloc::format!("{}", value));
         }
         result
     }
@@ -45,14 +45,16 @@ where
         let pc = interp.bytecode.pc();
         let opcode = interp.bytecode.opcode();
         let gas = interp.gas.remaining();
+        let refunded = interp.gas.refunded();
         let depth = context.journal_mut().depth();
+        let data_size = interp.memory.size();
 
         let op_name = OpCode::new(opcode).map_or("UNKNOWN", |op| op.as_str());
         let stack_str = Self::format_stack(&interp.stack);
 
         info!(
-            "depth:{}, PC:{}, gas:({}), OPCODE: name={},code={}, Stack:[{}]",
-            depth, pc, gas, op_name, opcode, stack_str
+            "depth:{}, PC:{}, gas:{:#x}({}), OPCODE: {}:({}) refund:{:#x}({}) Stack:[{}], Data size:{}",
+            depth, pc, gas, gas, op_name, opcode, refunded, refunded, stack_str, data_size
         );
     }
 }
