@@ -6,7 +6,7 @@ use revm::{
     context_interface::ContextTr,
     interpreter::{
         interpreter_types::{Jumps, MemoryTr, StackTr},
-        Interpreter, InterpreterTypes,
+        CallInputs, CallOutcome, Interpreter, InterpreterTypes,
     },
     state::bytecode::opcode::OpCode,
     Inspector,
@@ -14,12 +14,15 @@ use revm::{
 
 /// Inspector that logs EVM execution steps.
 #[derive(Debug, Default)]
-pub struct TracingInspector;
+pub struct TracingInspector {
+    /// Gas limit at the start of top-level call.
+    call_gas_limit: u64,
+}
 
 impl TracingInspector {
     /// Creates a new [`TracingInspector`].
     pub fn new() -> Self {
-        Self
+        Self { call_gas_limit: 0 }
     }
 
     /// Formats the stack for logging (decimal format).
@@ -56,5 +59,38 @@ where
             "depth:{}, PC:{}, gas:{:#x}({}), OPCODE: {}:({}) refund:{:#x}({}) Stack:[{}], Data size:{}",
             depth, pc, gas, gas, op_name, opcode, refunded, refunded, stack_str, data_size
         );
+    }
+
+    fn call(&mut self, context: &mut CTX, inputs: &mut CallInputs) -> Option<CallOutcome> {
+        let depth = context.journal_mut().depth();
+        if depth == 0 {
+            self.call_gas_limit = inputs.gas_limit;
+            info!(
+                target: "tx_trace",
+                caller = ?inputs.caller,
+                target = ?inputs.target_address,
+                gas_limit = inputs.gas_limit,
+                "Transaction call started"
+            );
+        }
+        None
+    }
+
+    fn call_end(&mut self, context: &mut CTX, inputs: &CallInputs, outcome: &mut CallOutcome) {
+        let depth = context.journal_mut().depth();
+        if depth == 0 {
+            let gas = outcome.gas();
+            let gas_used = self.call_gas_limit.saturating_sub(gas.remaining());
+            info!(
+                target: "tx_trace",
+                caller = ?inputs.caller,
+                target = ?inputs.target_address,
+                gas_limit = self.call_gas_limit,
+                gas_used = gas_used,
+                gas_refunded = gas.refunded(),
+                success = ?outcome.instruction_result(),
+                "Transaction call ended"
+            );
+        }
     }
 }
