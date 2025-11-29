@@ -119,17 +119,23 @@ where
         // 1. If the precompile has an accelerated version, use that.
         // 2. If the precompile is not accelerated, use the default version.
         // 3. If the precompile is not found, return None.
-        let is_accelerated = self.accelerated_precompiles.contains_key(&inputs.target_address);
-        let is_in_inner = self.inner.precompiles.get(&inputs.target_address).is_some();
+        //
+        // Note: Use `bytecode_address` (not `target_address`) to check for precompiles.
+        // For DELEGATECALL, `target_address` is the caller's address (storage context),
+        // while `bytecode_address` is the actual code address being executed.
+        let is_accelerated =
+            self.accelerated_precompiles.contains_key(&inputs.bytecode_address);
+        let is_in_inner = self.inner.precompiles.get(&inputs.bytecode_address).is_some();
         let output =
-            if let Some(accelerated) = self.accelerated_precompiles.get(&inputs.target_address) {
+            if let Some(accelerated) = self.accelerated_precompiles.get(&inputs.bytecode_address) {
                 (accelerated)(&input, inputs.gas_limit, &self.hint_writer, &self.oracle_reader)
-            } else if let Some(precompile) = self.inner.precompiles.get(&inputs.target_address) {
+            } else if let Some(precompile) = self.inner.precompiles.get(&inputs.bytecode_address) {
                 precompile.execute(&input, inputs.gas_limit)
             } else {
                 tracing::info!(
                     target: "precompile_trace",
-                    address = ?inputs.target_address,
+                    bytecode_address = ?inputs.bytecode_address,
+                    target_address = ?inputs.target_address,
                     is_accelerated = is_accelerated,
                     is_in_inner = is_in_inner,
                     "Precompile not found"
@@ -141,7 +147,7 @@ where
             Ok(out) => {
                 tracing::info!(
                     target: "precompile_trace",
-                    address = ?inputs.target_address,
+                    bytecode_address = ?inputs.bytecode_address,
                     accelerated = is_accelerated,
                     gas_limit = inputs.gas_limit,
                     gas_used = out.gas_used,
@@ -152,7 +158,7 @@ where
             Err(e) => {
                 tracing::info!(
                     target: "precompile_trace",
-                    address = ?inputs.target_address,
+                    bytecode_address = ?inputs.bytecode_address,
                     accelerated = is_accelerated,
                     gas_limit = inputs.gas_limit,
                     error = ?e,
