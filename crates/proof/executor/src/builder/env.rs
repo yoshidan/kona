@@ -23,7 +23,7 @@ use revm::{
     },
 };
 
-impl<P, H, Evm> StatelessL2Builder<'_, P, H, Evm>
+impl<P, H, Evm, IF> StatelessL2Builder<'_, P, H, Evm, IF>
 where
     P: TrieDBProvider,
     H: TrieHinter,

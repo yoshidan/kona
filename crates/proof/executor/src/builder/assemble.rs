@@ -18,7 +18,7 @@ use op_alloy_consensus::OpReceiptEnvelope;
 use op_alloy_rpc_types_engine::OpPayloadAttributes;
 use revm::{context::BlockEnv, database::BundleState};
 
-impl<P, H, Evm> StatelessL2Builder<'_, P, H, Evm>
+impl<P, H, Evm, IF> StatelessL2Builder<'_, P, H, Evm, IF>
 where
     P: TrieDBProvider,
     H: TrieHinter,
