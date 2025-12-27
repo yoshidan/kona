@@ -72,8 +72,8 @@ use revm::{
 /// impl InspectorFactory for CallDepthLoggerFactory {
 ///     type Inspector = CallDepthLogger;
 ///
-///     fn create(&self) -> Self::Inspector {
-///         CallDepthLogger { max_depth: 0 }
+///     fn create(&self) -> Option<Self::Inspector> {
+///         Some(CallDepthLogger { max_depth: 0 })
 ///     }
 /// }
 /// ```
@@ -86,19 +86,19 @@ pub trait InspectorFactory {
     /// Creates a new inspector instance.
     ///
     /// This method is called once per block execution to create a fresh inspector.
-    fn create(&self) -> Self::Inspector;
+    /// Returns `None` if no inspector should be used for this execution.
+    fn create(&self) -> Option<Self::Inspector>;
 }
 
 /// Implementation of [`InspectorFactory`] for the unit type `()`.
 ///
 /// This is used as the default type parameter for [`StatelessL2Builder`] and
-/// satisfies the `IF: InspectorFactory` bound when `None::<()>` is passed.
-/// The produced inspector is [`NoOpInspector`].
+/// always returns `None`, meaning no inspector will be used.
 impl InspectorFactory for () {
     type Inspector = NoOpInspector;
 
-    fn create(&self) -> Self::Inspector {
-        NoOpInspector
+    fn create(&self) -> Option<Self::Inspector> {
+        None
     }
 }
 
@@ -175,12 +175,13 @@ where
     /// understand OP-specific transaction types, system calls, and state
     /// management required for proper L2 block execution.
     pub(crate) factory: OpBlockExecutorFactory<OpAlloyReceiptBuilder, RollupConfig, Evm>,
-    /// The optional inspector factory for creating EVM inspectors.
+    /// The inspector factory for creating EVM inspectors.
     ///
-    /// When `Some`, uses [`EvmFactory::create_evm_with_inspector`] with the factory-created
-    /// inspector to trace or monitor EVM execution.
-    /// When `None`, uses [`EvmFactory::create_evm`] without any custom inspector.
-    pub(crate) inspector_factory: Option<IF>,
+    /// When [`InspectorFactory::create`] returns `Some`, uses
+    /// [`EvmFactory::create_evm_with_inspector`] with the factory-created inspector to trace
+    /// or monitor EVM execution.
+    /// When it returns `None`, uses [`EvmFactory::create_evm`] without any custom inspector.
+    pub(crate) inspector_factory: IF,
 }
 
 impl<'a, P, H, Evm, IF> StatelessL2Builder<'a, P, H, Evm, IF>
@@ -203,8 +204,8 @@ where
     /// * `provider` - Trie database provider for state access
     /// * `hinter` - Trie hinter for optimizing state access patterns
     /// * `parent_header` - Sealed header of the parent block to build upon
-    /// * `inspector_factory` - Optional inspector factory for creating EVM inspectors. Pass `None`
-    ///   to use the default no-op inspector.
+    /// * `inspector_factory` - Inspector factory for creating EVM inspectors. Pass `()` to use the
+    ///   default no-op inspector.
     ///
     /// # Returns
     /// A new [`StatelessL2Builder`] ready for block building operations
@@ -218,7 +219,7 @@ where
     ///     trie_provider,
     ///     trie_hinter,
     ///     parent_header,
-    ///     None,
+    ///     (),
     /// );
     ///
     /// // With custom inspector factory
@@ -228,7 +229,7 @@ where
     ///     trie_provider,
     ///     trie_hinter,
     ///     parent_header,
-    ///     Some(MyInspectorFactory),
+    ///     MyInspectorFactory,
     /// );
     /// ```
     pub fn new(
@@ -237,7 +238,7 @@ where
         provider: P,
         hinter: H,
         parent_header: Sealed<Header>,
-        inspector_factory: Option<IF>,
+        inspector_factory: IF,
     ) -> Self {
         let trie_db = TrieDB::new(parent_header, provider, hinter);
         let factory = OpBlockExecutorFactory::new(
@@ -370,15 +371,15 @@ where
                 .without_state_clear()
                 .build();
 
-            let ex_result = match &self.inspector_factory {
-                // When no custom inspector factory is provided, use the standard create_evm().
+            let ex_result = match self.inspector_factory.create() {
+                // When no inspector is created, use the standard create_evm().
                 None => {
                     let evm = self.factory.evm_factory().create_evm(&mut state, evm_env);
                     let executor = self.factory.create_executor(evm, ctx);
                     executor.execute_block(transactions.iter())?
                 }
-                // When a custom inspector factory is provided, we need to use raw pointers
-                // to work around the borrow checker's limitations with generic types.
+                // When an inspector is created, we need to use raw pointers to work around
+                // the borrow checker's limitations with generic types.
                 //
                 // NOTE: With a generic IF::Inspector, Rust cannot prove that the mutable
                 // borrow of state ends when the EVM is dropped. We use raw pointers to work
@@ -386,9 +387,8 @@ where
                 // 1. The state is valid for the entire duration of EVM usage
                 // 2. The EVM is consumed by execute_block before we access state again
                 // 3. No other references to state exist during EVM usage
-                Some(factory) => {
+                Some(inspector) => {
                     let state_ptr = &mut state as *mut _;
-                    let inspector = factory.create();
                     // SAFETY: state is valid and not accessed elsewhere during EVM usage.
                     // The EVM is consumed by execute_block, ending the borrow.
                     let evm = self.factory.evm_factory().create_evm_with_inspector(

@@ -230,7 +230,7 @@ where
                 l2_provider.clone(),
                 l2_provider.clone(),
                 parent_header.seal_slow(),
-                None::<()>,
+                (),
             );
 
             // Execute the block and take the new header. At this point, the block is guaranteed to

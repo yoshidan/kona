@@ -36,8 +36,8 @@ where
     trie_hinter: H,
     /// The evm factory for the executor.
     evm_factory: Evm,
-    /// The optional inspector factory for the executor.
-    inspector_factory: Option<IF>,
+    /// The inspector factory for the executor.
+    inspector_factory: IF,
     /// The executor.
     inner: Option<StatelessL2Builder<'a, P, H, Evm, IF>>,
 }
@@ -55,7 +55,7 @@ where
         trie_provider: P,
         trie_hinter: H,
         evm_factory: Evm,
-        inspector_factory: Option<IF>,
+        inspector_factory: IF,
     ) -> Self {
         Self {
             rollup_config,
